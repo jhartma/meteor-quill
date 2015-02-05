@@ -1,6 +1,6 @@
 Package.describe({
   name: 'jhartma:quill',
-  version: '0.0.1',
+  version: '0.0.2',
   // Brief, one-line summary of the package.
   summary: 'Quill.js version 0.19.8 for Meteor',
   // URL to the Git repository containing the source code for this package.
@@ -18,4 +18,6 @@ Package.onUse(function(api) {
   api.export('Quill','client');
   api.addFiles('quill/quill.js','client');
   api.addFiles('quill.js','client');
+  api.addFiles('quill/quill.base.css', 'client');
+  api.addFiles('quill/quill.snow.css', 'client');
 });
