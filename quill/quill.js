@@ -1,4 +1,4 @@
-/*! Quill Editor v0.19.14
+/*! Quill Editor v0.20.0
  *  https://quilljs.com/
  *  Copyright (c) 2014, Jason Chen
  *  Copyright (c) 2013, salesforce.com
@@ -5910,7 +5910,7 @@ diff.EQUAL = DIFF_EQUAL;
 module.exports = diff;
 
 },{}],7:[function(_dereq_,module,exports){
-module.exports={"version":"0.19.14"}
+module.exports={"version":"0.20.0"}
 },{}],8:[function(_dereq_,module,exports){
 var Delta, Document, Format, Line, LinkedList, Normalizer, _, dom;
 
@@ -6263,7 +6263,7 @@ Editor = (function() {
     this.checkUpdate();
     ref = this.doc.findLeafAt(index, true), leaf = ref[0], offset = ref[1];
     if (leaf == null) {
-      throw new Error('Invalid index');
+      return null;
     }
     containerBounds = this.root.parentNode.getBoundingClientRect();
     side = 'left';
@@ -6542,8 +6542,11 @@ Format = (function() {
       return node;
     }
     if (_.isString(this.config.parentTag)) {
-      parentNode = document.createElement(this.config.parentTag);
-      dom(node).wrap(parentNode);
+      parentNode = node.parentNode;
+      if (parentNode.tagName !== this.config.parentTag) {
+        parentNode = document.createElement(this.config.parentTag);
+        dom(node).wrap(parentNode);
+      }
       if (node.parentNode.tagName === ((ref = node.parentNode.previousSibling) != null ? ref.tagName : void 0)) {
         dom(node.parentNode.previousSibling).merge(node.parentNode);
       }
@@ -6551,7 +6554,7 @@ Format = (function() {
         dom(node.parentNode).merge(node.parentNode.nextSibling);
       }
     }
-    if (_.isString(this.config.tag)) {
+    if (_.isString(this.config.tag) && node.tagName !== this.config.tag) {
       formatNode = document.createElement(this.config.tag);
       if (dom.VOID_TAGS[formatNode.tagName] != null) {
         if (node.parentNode != null) {
@@ -6559,7 +6562,7 @@ Format = (function() {
         }
         node = formatNode;
       } else if (this.isType(Format.types.LINE)) {
-        node = dom(node).switchTag(this.config.tag);
+        node = dom(node).switchTag(this.config.tag).get();
       } else {
         dom(node).wrap(formatNode);
         node = formatNode;
@@ -6667,12 +6670,12 @@ Format = (function() {
             dom(node.nextSibling).splitBefore(node.parentNode.parentNode);
           }
         }
-        node = dom(node).switchTag(dom.DEFAULT_BLOCK_TAG);
+        node = dom(node).switchTag(dom.DEFAULT_BLOCK_TAG).get();
       } else if (this.isType(Format.types.EMBED)) {
         dom(node).remove();
         return void 0;
       } else {
-        node = dom(node).switchTag(dom.DEFAULT_INLINE_TAG);
+        node = dom(node).switchTag(dom.DEFAULT_INLINE_TAG).get();
       }
     }
     if (_.isString(this.config.parentTag)) {
@@ -6760,7 +6763,7 @@ Leaf = (function(superClass) {
     if (dom.EMBED_TAGS[this.node.tagName] != null) {
       textNode = document.createTextNode(this.text);
       dom(textNode).data(Leaf.DATA_KEY, this);
-      return this.node = dom(this.node).replace(textNode);
+      return this.node = dom(this.node).replace(textNode).get();
     } else {
       return dom(this.node).text(this.text);
     }
@@ -6775,7 +6778,7 @@ Leaf = (function(superClass) {
       textNode = document.createTextNode(text);
       dom(textNode).data(Leaf.DATA_KEY, this);
       if (this.node.tagName === dom.DEFAULT_BREAK_TAG) {
-        this.node = dom(this.node).replace(textNode);
+        this.node = dom(this.node).replace(textNode).get();
       } else {
         this.node.appendChild(textNode);
         this.node = textNode;
@@ -7131,6 +7134,9 @@ Normalizer = (function() {
   Normalizer.prototype.normalizeLine = function(lineNode) {
     lineNode = Normalizer.wrapInline(lineNode);
     lineNode = Normalizer.handleBreaks(lineNode);
+    if (lineNode.tagName === 'LI') {
+      Normalizer.flattenList(lineNode);
+    }
     lineNode = Normalizer.pullBlocks(lineNode);
     lineNode = this.normalizeNode(lineNode);
     Normalizer.unwrapText(lineNode);
@@ -7155,6 +7161,10 @@ Normalizer = (function() {
         return node.removeAttribute(attribute);
       }
     });
+    if (node.style.fontWeight === 'bold') {
+      node.style.fontWeight = '';
+      dom(node).wrap(document.createElement('b'));
+    }
     this.whitelistStyles(node);
     return this.whitelistTags(node);
   };
@@ -7181,17 +7191,31 @@ Normalizer = (function() {
       return node;
     }
     if (Normalizer.ALIASES[node.tagName] != null) {
-      node = dom(node).switchTag(Normalizer.ALIASES[node.tagName]);
+      node = dom(node).switchTag(Normalizer.ALIASES[node.tagName]).get();
     } else if (this.whitelist.tags[node.tagName] == null) {
       if (dom.BLOCK_TAGS[node.tagName] != null) {
-        node = dom(node).switchTag(dom.DEFAULT_BLOCK_TAG);
+        node = dom(node).switchTag(dom.DEFAULT_BLOCK_TAG).get();
       } else if (!node.hasAttributes() && (node.firstChild != null)) {
         node = dom(node).unwrap();
       } else {
-        node = dom(node).switchTag(dom.DEFAULT_INLINE_TAG);
+        node = dom(node).switchTag(dom.DEFAULT_INLINE_TAG).get();
       }
     }
     return node;
+  };
+
+  Normalizer.flattenList = function(listNode) {
+    var innerItems, innerLists, ref;
+    ref = listNode.nextSibling;
+    innerItems = _.map(listNode.querySelectorAll('li'));
+    innerItems.forEach(function(item) {
+      listNode.parentNode.insertBefore(item, ref);
+      return ref = item.nextSibling;
+    });
+    innerLists = _.map(listNode.querySelectorAll(Object.keys(dom.LIST_TAGS).join(',')));
+    return innerLists.forEach(function(list) {
+      return dom(list).remove();
+    });
   };
 
   Normalizer.handleBreaks = function(lineNode) {
@@ -7851,7 +7875,7 @@ Wrapper = (function() {
   Wrapper.prototype.replace = function(newNode) {
     this.node.parentNode.replaceChild(newNode, this.node);
     this.node = newNode;
-    return newNode;
+    return this;
   };
 
   Wrapper.prototype.splitBefore = function(root, force) {
@@ -7952,7 +7976,8 @@ Wrapper = (function() {
       this.moveChildren(newNode);
     }
     this.replace(newNode);
-    return this.attributes(attributes).get();
+    this.node = newNode;
+    return this.attributes(attributes);
   };
 
   Wrapper.prototype.text = function(text) {
@@ -8862,7 +8887,7 @@ Keyboard = (function() {
         _.each(leaf.formats, function(value, format) {
           _this.quill.prepareFormat(format, value);
           if (_this.toolbar != null) {
-            return _this.toolbar.setActive(format, value);
+            _this.toolbar.setActive(format, value);
           }
         });
         return false;
@@ -9318,6 +9343,9 @@ MultiCursor = (function(superClass) {
   MultiCursor.prototype._updateCursor = function(cursor) {
     var bounds, flag;
     bounds = this.quill.getBounds(cursor.index);
+    if (bounds == null) {
+      return this.removeCursor(cursor.userId);
+    }
     cursor.elem.style.top = (bounds.top + this.quill.container.scrollTop) + 'px';
     cursor.elem.style.left = bounds.left + 'px';
     cursor.elem.style.height = bounds.height + 'px';
@@ -9336,7 +9364,8 @@ module.exports = MultiCursor;
 
 
 },{"../quill":30,"eventemitter2":2}],26:[function(_dereq_,module,exports){
-var Delta, Document, PasteManager, Quill, _, dom;
+var Delta, Document, PasteManager, Quill, _, dom,
+  bind = function(fn, me){ return function(){ return fn.apply(me, arguments); }; };
 
 Quill = _dereq_('../quill');
 
@@ -9349,13 +9378,33 @@ dom = Quill.require('dom');
 Delta = Quill.require('delta');
 
 PasteManager = (function() {
+  PasteManager.DEFAULTS = {
+    onConvert: null
+  };
+
   function PasteManager(quill, options) {
+    var base;
     this.quill = quill;
-    this.options = options;
+    this._onConvert = bind(this._onConvert, this);
     this.container = this.quill.addContainer('ql-paste-manager');
     this.container.setAttribute('contenteditable', true);
     dom(this.quill.root).on('paste', _.bind(this._paste, this));
+    this.options = _.defaults(options, PasteManager.DEFAULTS);
+    if ((base = this.options).onConvert == null) {
+      base.onConvert = this._onConvert;
+    }
   }
+
+  PasteManager.prototype._onConvert = function(container) {
+    var delta, doc, lengthAdded;
+    doc = new Document(container, this.quill.options);
+    delta = doc.toDelta();
+    lengthAdded = delta.length();
+    if (lengthAdded === 0) {
+      return delta;
+    }
+    return delta.compose(new Delta().retain(lengthAdded - 1)["delete"](1));
+  };
 
   PasteManager.prototype._paste = function() {
     var oldDocLength, range;
@@ -9367,12 +9416,10 @@ PasteManager = (function() {
     this.container.focus();
     return _.defer((function(_this) {
       return function() {
-        var delta, doc, lengthAdded, line, lineBottom, offset, ref, windowBottom;
-        doc = new Document(_this.container, _this.quill.options);
-        delta = doc.toDelta();
-        lengthAdded = Math.max(0, delta.length() - 1);
+        var delta, lengthAdded, line, lineBottom, offset, ref, windowBottom;
+        delta = _this.options.onConvert(_this.container);
+        lengthAdded = delta.length();
         if (lengthAdded > 0) {
-          delta = delta.compose(new Delta().retain(lengthAdded)["delete"](1));
           if (range.start > 0) {
             delta.ops.unshift({
               retain: range.start
@@ -9798,7 +9845,8 @@ Delta = Quill.require('delta');
 UndoManager = (function() {
   UndoManager.DEFAULTS = {
     delay: 1000,
-    maxStack: 100
+    maxStack: 100,
+    userOnly: false
   };
 
   UndoManager.hotkeys = {
@@ -9838,11 +9886,15 @@ UndoManager = (function() {
       };
     })(this));
     return this.quill.on(this.quill.constructor.events.TEXT_CHANGE, (function(_this) {
-      return function(delta, origin) {
+      return function(delta, source) {
         if (_this.ignoreChange) {
           return;
         }
-        _this.record(delta, _this.oldDelta);
+        if (!_this.options.userOnly || source === Quill.sources.USER) {
+          _this.record(delta, _this.oldDelta);
+        } else {
+          _this._transform(delta);
+        }
         return _this.oldDelta = _this.quill.getContents();
       };
     })(this));
@@ -9919,13 +9971,32 @@ UndoManager = (function() {
       change = this.stack[source].pop();
       this.lastRecorded = 0;
       this.ignoreChange = true;
-      this.quill.updateContents(change[source], 'user');
+      this.quill.updateContents(change[source], Quill.sources.USER);
       this.ignoreChange = false;
       index = this._getLastChangeIndex(change[source]);
       this.quill.setSelection(index, index);
       this.oldDelta = this.quill.getContents();
       return this.stack[dest].push(change);
     }
+  };
+
+  UndoManager.prototype._transform = function(delta) {
+    var change, i, j, len, len1, ref, ref1, results;
+    this.oldDelta = delta.transform(this.oldDelta, true);
+    ref = this.stack.undo;
+    for (i = 0, len = ref.length; i < len; i++) {
+      change = ref[i];
+      change.undo = delta.transform(change.undo, true);
+      change.redo = delta.transform(change.redo, true);
+    }
+    ref1 = this.stack.redo;
+    results = [];
+    for (j = 0, len1 = ref1.length; j < len1; j++) {
+      change = ref1[j];
+      change.undo = delta.transform(change.undo, true);
+      results.push(change.redo = delta.transform(change.redo, true));
+    }
+    return results;
   };
 
   return UndoManager;
@@ -9938,7 +10009,7 @@ module.exports = UndoManager;
 
 
 },{"../quill":30}],30:[function(_dereq_,module,exports){
-var Delta, Editor, EventEmitter2, Format, Normalizer, Quill, Range, _, dom, pkg,
+var Delta, Document, Editor, EventEmitter2, Format, Normalizer, Quill, Range, _, dom, pkg,
   extend = function(child, parent) { for (var key in parent) { if (hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; },
   hasProp = {}.hasOwnProperty,
   slice = [].slice;
@@ -9952,6 +10023,8 @@ Delta = _dereq_('rich-text/lib/delta');
 EventEmitter2 = _dereq_('eventemitter2').EventEmitter2;
 
 dom = _dereq_('./lib/dom');
+
+Document = _dereq_('./core/document');
 
 Editor = _dereq_('./core/editor');
 
@@ -10022,6 +10095,8 @@ Quill = (function(superClass) {
         return Normalizer;
       case 'dom':
         return dom;
+      case 'document':
+        return Document;
       case 'range':
         return Range;
       default:
@@ -10353,7 +10428,7 @@ Quill.registerTheme('snow', _dereq_('./themes/snow'));
 module.exports = Quill;
 
 
-},{"../package.json":7,"./core/editor":9,"./core/format":10,"./core/normalizer":13,"./lib/dom":17,"./lib/range":20,"./themes/base":32,"./themes/snow":33,"eventemitter2":2,"lodash":1,"rich-text/lib/delta":3}],31:[function(_dereq_,module,exports){
+},{"../package.json":7,"./core/document":8,"./core/editor":9,"./core/format":10,"./core/normalizer":13,"./lib/dom":17,"./lib/range":20,"./themes/base":32,"./themes/snow":33,"eventemitter2":2,"lodash":1,"rich-text/lib/delta":3}],31:[function(_dereq_,module,exports){
 module.exports = ".ql-image-tooltip{padding:10px;width:300px}.ql-image-tooltip:after{clear:both;content:\"\";display:table}.ql-image-tooltip a{border:1px solid #000;box-sizing:border-box;display:inline-block;float:left;padding:5px;text-align:center;width:50%}.ql-image-tooltip img{bottom:0;left:0;margin:auto;max-height:100%;max-width:100%;position:absolute;right:0;top:0}.ql-image-tooltip .input{box-sizing:border-box;width:100%}.ql-image-tooltip .preview{margin:10px 0;position:relative;border:1px dashed #000;height:200px}.ql-image-tooltip .preview span{display:inline-block;position:absolute;text-align:center;top:40%;width:100%}.ql-link-tooltip{padding:5px 10px}.ql-link-tooltip input.input{width:170px}.ql-link-tooltip a.done,.ql-link-tooltip input.input{display:none}.ql-link-tooltip a.change{margin-right:4px}.ql-link-tooltip.editing a.done,.ql-link-tooltip.editing input.input{display:inline-block}.ql-link-tooltip.editing a.change,.ql-link-tooltip.editing a.remove,.ql-link-tooltip.editing a.url{display:none}.ql-multi-cursor{position:absolute;left:0;top:0;z-index:1000}.ql-multi-cursor .cursor{margin-left:-1px;position:absolute}.ql-multi-cursor .cursor-flag{bottom:100%;position:absolute;white-space:nowrap}.ql-multi-cursor .cursor-name{display:inline-block;color:#fff;padding:2px 8px}.ql-multi-cursor .cursor-caret{height:100%;position:absolute;width:2px}.ql-multi-cursor .cursor.hidden .cursor-flag{display:none}.ql-multi-cursor .cursor.top .cursor-flag{bottom:auto;top:100%}.ql-multi-cursor .cursor.right .cursor-flag{right:-2px}.ql-paste-manager{left:-100000px;position:absolute;top:50%}.ql-toolbar{box-sizing:border-box}.ql-tooltip{background-color:#fff;border:1px solid #000;box-sizing:border-box;position:absolute;top:0;white-space:nowrap;z-index:2000}.ql-tooltip a{cursor:pointer;text-decoration:none}.ql-container{box-sizing:border-box;cursor:text;font-family:Helvetica,Arial,sans-serif;font-size:13px;height:100%;line-height:1.42;margin:0;overflow-x:hidden;overflow-y:auto;padding:12px 15px;position:relative}.ql-editor{box-sizing:border-box;min-height:100%;outline:0;tab-size:4;white-space:pre-wrap}.ql-editor div{margin:0;padding:0}.ql-editor a{text-decoration:underline}.ql-editor b{font-weight:700}.ql-editor i{font-style:italic}.ql-editor s{text-decoration:line-through}.ql-editor u{text-decoration:underline}.ql-editor a,.ql-editor b,.ql-editor i,.ql-editor s,.ql-editor span,.ql-editor u{background-color:inherit}.ql-editor img{max-width:100%}.ql-editor blockquote,.ql-editor ol,.ql-editor ul{margin:0 0 0 2em;padding:0}.ql-editor ol{list-style-type:decimal}.ql-editor ul{list-style-type:disc}.ql-editor.ql-ie-10 br,.ql-editor.ql-ie-9 br{display:none}";
 },{}],32:[function(_dereq_,module,exports){
 var BaseTheme, _, baseStyles, dom;
