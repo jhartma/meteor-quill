@@ -1,8 +1,8 @@
 Package.describe({
   name: 'themeteorites:quilljs',
-  version: '0.0.5',
+  version: '0.20.1',
   // Brief, one-line summary of the package.
-  summary: 'Quill.js version 0.20.0 for Meteor',
+  summary: 'Quill.js version 0.20.1 for Meteor',
   // URL to the Git repository containing the source code for this package.
   git: 'https://github.com/themeteorites/quilljs',
   // By default, Meteor will default to using README.md for documentation.
